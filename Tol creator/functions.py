@@ -4,9 +4,13 @@ import numpy as np
 import time
 import keyboard
 
+HEIGHT = 50
+WIDTH = 128
+
 FPS = 30
 DURATION = 40  # seconds
 FRAME_COUNT = FPS * DURATION+30+30
+FRAME_COUNT = 5*(4*HEIGHT+HEIGHT*3)
 DROP_COUNT = 100  # Increase the number of single-pixel raindrops
 
 
@@ -56,9 +60,6 @@ def display_frame():
 def black_frame():
     global byte_array
     byte_array = [[[0 for _ in range(3)] for _ in range(WIDTH)] for _ in range(HEIGHT)]
-
-HEIGHT = 50
-WIDTH = 128
 
 # Define some hex values 
 hex_values = [0x00,0xff,0xff,0xff,0xaa,0xaa,0xbb,0xbb,0x00,0x00,0x00,0x00,0x00,0x00]
