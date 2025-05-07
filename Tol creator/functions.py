@@ -48,7 +48,7 @@ def display_frame():
         for x in range(WIDTH):
             color = rgb_array[y, x]
             if np.any(color):  # If the pixel is not black
-                cv2.circle(frame, (x * px + 2, y * px + 2), 1, color.tolist(), -1)  # Draw a dot
+                cv2.circle(frame, (x * px + 2, y * px + 2), 2, color.tolist(), -1)  # Draw a dot
 
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     frames.append(frame)
