@@ -8,9 +8,9 @@ HEIGHT = 50
 WIDTH = 128
 
 FPS = 30
-DURATION = 40  # seconds
+DURATION = 30  # seconds
 FRAME_COUNT = FPS * DURATION+30+30
-FRAME_COUNT = 5*(4*HEIGHT+HEIGHT*3)
+#FRAME_COUNT = 5*(4*HEIGHT+HEIGHT*3)
 DROP_COUNT = 100  # Increase the number of single-pixel raindrops
 
 
