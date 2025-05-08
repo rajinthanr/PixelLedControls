@@ -30,16 +30,14 @@ while True and current_frame < FRAME_COUNT - 30:
 
             print("Frame: ", current_frame, " / ", FRAME_COUNT, end="\r")
             pre_time = count
-            fade_pixels(byte_array, 1)
+            fade_pixels(byte_array, 0.7)
         continue
 
     pTloop = count
     
     for i in range(PARTICLE_COUNT):
         x, y = particles[i]
-        hue = count/100 + random.randint(0, 80)
-        color = hsv_to_rgb(hue / 360.0, 1.0, 1.0)  # Assuming hsv_to_rgb is defined elsewhere
-        
+        color = hsv_to_rgb(120/360, random.randint(0,100)/100 , 1.0)  # White has saturation 0, green has saturation 1
         # Update particle position
         new_x = random.randint(0, WIDTH)  # Slightly move left or right
         new_y = random.randint(0, HEIGHT)   # Move downward
@@ -49,8 +47,8 @@ while True and current_frame < FRAME_COUNT - 30:
         new_y = max(0, min(HEIGHT - 1, new_y))
         
         for j in range(3):
-            if byte_array[new_y][new_x][j] == 0:
-                byte_array[new_y][new_x][j] = int(color[j] * 255)
+            byte_array[new_y][new_x][j] = int(color[j] * 255)
+            byte_array[new_y][new_x][j] = min(255, byte_array[new_y][new_x][j])
 
     if escape:
         break

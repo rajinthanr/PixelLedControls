@@ -28,7 +28,7 @@ TETRIS_COLORS = [
 ]
 
 # Initialize Tetris blocks and their colors
-DROP_COUNT = 40  # Number of blocks to drop
+DROP_COUNT = 200  # Number of blocks to drop
 blocks = [random.choice(TETRIS_SHAPES) for _ in range(DROP_COUNT)]
 block_colors = [TETRIS_COLORS[TETRIS_SHAPES.index(block)] for block in blocks]
 block_positions = [(random.randint(0, WIDTH - len(blocks[i][0])), random.randint(-HEIGHT, 0)) for i in range(DROP_COUNT)]

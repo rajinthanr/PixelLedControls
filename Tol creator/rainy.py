@@ -8,8 +8,10 @@ def exit_program():
 
 keyboard.add_hotkey('esc', exit_program)
 
-drops = [random.randint(-HEIGHT, 0) for _ in range(DROP_COUNT)]
-x_positions = [random.randint(0, WIDTH - 1) for _ in range(DROP_COUNT)]
+PARTICLE_COUNT = 1000  
+
+drops = [random.randint(-HEIGHT, 0) for _ in range(PARTICLE_COUNT)]
+x_positions = [random.randint(0, WIDTH - 1) for _ in range(PARTICLE_COUNT)]
 
 current_frame = 30
 while True and current_frame < FRAME_COUNT-30:
@@ -22,28 +24,31 @@ while True and current_frame < FRAME_COUNT-30:
 
             print("Frame: ", current_frame, " / ", FRAME_COUNT, end="\r")
             pre_time = count
+            fade_pixels(byte_array, 25)  # Fade all pixels by 10
         continue
 
     pTloop = count
 
-    for i in range(DROP_COUNT):
-        y = drops[i]
+    for i in range(PARTICLE_COUNT):
+        y = int(drops[i])
         x = x_positions[i]
 
         # Draw the raindrop as a single pixel
-        if 0 <= y < HEIGHT:
-            if(x%2):
-                color = [255, 255, 255]  
-            else:
-                color = [0, 255, 0]
-            for j in range(3):
-                byte_array[y][x][j] += int(color[j])
-                byte_array[y][x][j] = min(255, byte_array[y][x][j])  # Limit the range to 0-255
+        
+        if(x%2):
+            color = [255, 255, 255]  
+        else:
+            color = [0, 255, 0]
+        for j in range(3):
+            for b in range(3):
+                if 0 <= y+b < HEIGHT:
+                    byte_array[y+b][x][j] += int(color[j]*0.7)
+                    byte_array[y+b][x][j] = min(255, byte_array[y+b][x][j])
             
             #draw.point((x, y), fill=color)
 
         # Move the raindrop down
-        drops[i] += 1
+        drops[i] += 0.3
 
         # If the raindrop goes beyond the bottom, reset it at a random position
         if drops[i] >= HEIGHT and current_frame < FRAME_COUNT-120:
@@ -51,7 +56,6 @@ while True and current_frame < FRAME_COUNT-30:
             x_positions[i] = random.randint(0, WIDTH - 1)
     
     
-    fade_pixels(byte_array, 15)  # Fade all pixels by 10
 
     if(escape):
         break

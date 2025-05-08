@@ -35,6 +35,7 @@ def save_frame():
     with open("output.tol", "ab") as f:
         for row in byte_array:
             for pixel in row:
+                pixel = [int(min(255, max(0, pix))) for pix in pixel ]  # Ensure pixel values are capped at 255
                 f.write(bytes(pixel))  # Write each pixel (RGB) as bytes
 
 def display_frame():
