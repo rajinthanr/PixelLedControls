@@ -13,7 +13,7 @@ keyboard.add_hotkey('esc', exit_program)
 # Define Tetris block shapes and their corresponding colors
 TETRIS_SHAPES = [
     [[1, 1, 1, 1]],  # Line
-    [[1, 1], [1, 1]],  # Square
+    [[1, 1], [1, 1]],  # S\quare
     [[0, 1, 0], [1, 1, 1]],  # T-shape
     [[1, 1, 0], [0, 1, 1]],  # Z-shape
     [[0, 1, 1], [1, 1, 0]]   # S-shape

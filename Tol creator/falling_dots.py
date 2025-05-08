@@ -37,7 +37,7 @@ while True and current_frame < FRAME_COUNT - 30:
     for i in range(PARTICLE_COUNT):
         y = particles[i]
         x= i % WIDTH  # Horizontal position based on index
-        hue = count / 10  - x*4 +1000
+        hue = x*4 +1000
         color = hsv_to_rgb(hue / 360.0, 1.0, 1.0)  # Assuming hsv_to_rgb is defined elsewhere
 
         # Update particle position for left-to-right sweeping motion
