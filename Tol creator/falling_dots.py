@@ -1,12 +1,5 @@
 from functions import *
 
-escape = False
-def exit_program():
-    global escape
-    escape = True
-    print("Exiting program...")
-
-keyboard.add_hotkey('esc', exit_program)
 
 # Define Tetris block shapes
 
@@ -27,7 +20,6 @@ while True and current_frame < FRAME_COUNT - 30:
             save_frame()  # Save the current frame to the tol file
             display_frame()  # Display the current frame on window
 
-            print("Frame: ", current_frame, " / ", FRAME_COUNT, end="\r")
             pre_time = count
             fade_pixels(byte_array, 7)
         continue
@@ -52,7 +44,7 @@ while True and current_frame < FRAME_COUNT - 30:
         for j in range(3):
             byte_array[new_y][new_x][j] = int(color[j] * 255)
 
-    if escape:
+    if escape[0]:
         break
 
 black_frame()  # Clear the screen

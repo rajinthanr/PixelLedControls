@@ -1,36 +1,25 @@
 from functions import *
 
-escape = False
-def exit_program():
-    global escape
-    escape = True
-    print("Exiting program...")
+# ── Tweak these two values ───────────────────────────────────────────────────
+SPEED      = 80   # physics updates per frame — lower = faster movement
+FADE       = 15   # brightness subtracted each frame (0–255) — higher = shorter trail
+# ─────────────────────────────────────────────────────────────────────────────
 
-keyboard.add_hotkey('esc', exit_program)
-
-# Define Tetris block shapes
-
-# Define Tetris block shapes and their corresponding colors
-# Define confetti colors
-
-# Initialize confetti particles
-PARTICLE_COUNT = 500  # Number of confetti particles
+PARTICLE_COUNT = 500
 particles = [(random.randint(0, WIDTH - 1), random.randint(0, HEIGHT)) for _ in range(PARTICLE_COUNT)]
-particle_hues = [random.randint(0, 360) for _ in range(PARTICLE_COUNT)]  # Store hues for particles
 
 # Main loop
 while True and current_frame < FRAME_COUNT - 30:
     count += 1
-    if count - pTloop < 40:
+    if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):
             current_frame += 1
 
-            save_frame()  # Save the current frame to the tol file
-            display_frame()  # Display the current frame on window
+            save_frame()
+            display_frame()
 
-            print("Frame: ", current_frame, " / ", FRAME_COUNT, end="\r")
             pre_time = count
-            fade_pixels(byte_array, 15)
+            fade_pixels(byte_array, FADE)
         continue
 
     pTloop = count
@@ -55,7 +44,7 @@ while True and current_frame < FRAME_COUNT - 30:
         for j in range(3):
             byte_array[new_y][new_x][j] = int(color[j] * 255)
 
-    if escape:
+    if escape[0]:
         break
 
 black_frame()  # Clear the screen

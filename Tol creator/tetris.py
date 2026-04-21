@@ -1,12 +1,5 @@
 from functions import *
 
-escape = False
-def exit_program():
-    global escape
-    escape = True
-    print("Exiting program...")
-
-keyboard.add_hotkey('esc', exit_program)
 
 # Define Tetris block shapes
 
@@ -50,7 +43,6 @@ while True and current_frame < FRAME_COUNT - 30:
             save_frame()  # Save the current frame to the tol file
             display_frame()  # Display the current frame on window
 
-            print("Frame: ", current_frame, " / ", FRAME_COUNT, end="\r")
             pre_time = count
         continue
 
@@ -96,7 +88,7 @@ while True and current_frame < FRAME_COUNT - 30:
             block_colors[i] = TETRIS_COLORS[TETRIS_SHAPES.index(blocks[i])]
             block_positions[i] = (random.randint(0, WIDTH - len(blocks[i][0])), random.randint(-20, 0))
 
-    if escape:
+    if escape[0]:
         break
 
 black_frame()  # Clear the screen

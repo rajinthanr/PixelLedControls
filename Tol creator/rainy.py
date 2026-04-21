@@ -1,12 +1,5 @@
 from functions import *
 
-escape = False
-def exit_program():
-    global escape
-    escape = True
-    print("Exiting program...")
-
-keyboard.add_hotkey('esc', exit_program)
 
 PARTICLE_COUNT = 1000  
 
@@ -22,7 +15,6 @@ while True and current_frame < FRAME_COUNT-30:
             save_frame() #save the current frame to the tol file
             display_frame() # Display the current frame on window
 
-            print("Frame: ", current_frame, " / ", FRAME_COUNT, end="\r")
             pre_time = count
             fade_pixels(byte_array, 25)  # Fade all pixels by 10
         continue
@@ -57,7 +49,7 @@ while True and current_frame < FRAME_COUNT-30:
     
     
 
-    if(escape):
+    if escape[0]:
         break
 
 black_frame()  # Clear the screen
