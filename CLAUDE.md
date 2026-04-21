@@ -16,13 +16,13 @@ Each pattern is a standalone Python script in `Tol creator/`. Run directly — V
 
 ```bash
 cd "Tol creator"
-python3 hor_lines.py    # or rainy.py, confetti.py, tetris.py, falling_dots.py, story.py
+python3 rainy.py    # or any other pattern script
 ```
 
-- The `.tol` file is written directly to `Tol files/<scriptname>.tol` (e.g. `hor_lines.py` → `Tol files/hor_lines.tol`).
-- An OpenCV preview window opens immediately (black, full-size) before the first frame renders.
-- Stop early: press **q** or **Esc** in the preview window, or click the window's **close (X) button**.
-- Window size is saved to `Tol creator/.window_config.json` on close and restored on next run.
+- Running a script opens a **preview-only** GUI — no `.tol` file is written during playback.
+- To save: press **S** or click the **"Save .tol"** button in the GUI bar. The GUI closes, then the script re-runs automatically in headless mode and writes the file to `Tol files/<scriptname>.tol`.
+- Stop without saving: press **q** or **Esc**, or click the window's close **(X)** button.
+- Window size is saved to `Tol creator/.window_config.json` on close and restored on next run (default 1400 × 640).
 
 ## Dependencies
 
@@ -42,10 +42,10 @@ Qt font warnings (`QFontDatabase: Cannot find font directory`) are fixed by copy
 All pattern scripts do `from functions import *`. **Importing this module is also initialisation** — it immediately:
 
 1. Derives `OUTPUT_FILE` from `sys.argv[0]`: `../Tol files/<scriptname>.tol`
-2. Writes the 14-byte `.tol` header to that file
-3. Writes 30 leading black frames
-4. Opens the OpenCV preview window (restoring last-used size from `.window_config.json`)
-5. Initialises all global mutable state
+2. Detects `--headless` flag in `sys.argv` (set `_HEADLESS = True`)
+3. **GUI mode**: opens the OpenCV preview window, registers mouse callback, restores window size
+4. **Headless mode**: writes the 14-byte `.tol` header and 30 lead-in black frames directly to file; no window opened
+5. Registers an `atexit` handler that spawns the headless re-run when `_pending_save[0]` is set
 
 #### Grid constants
 
@@ -61,24 +61,34 @@ All pattern scripts do `from functions import *`. **Importing this module is als
 
 #### Key functions
 
-- `save_frame()` — appends `byte_array` to the `.tol` file as raw RGB bytes, each channel clamped to 0–255.
-- `display_frame()` — renders the 7-panel visualiser, handles key/close detection, saves window size, prints progress once per second.
+- `save_frame()` — **headless mode**: appends `byte_array` to the `.tol` file as raw RGB bytes. **GUI mode**: no-op (preview only).
+- `display_frame()` — **GUI mode**: renders the 7-panel visualiser, handles key/button/close detection, saves window size. **Headless mode**: prints progress only, no display.
 - `black_frame()` — resets `byte_array` to all zeros and saves window config.
 - `fade_pixels(byte_array, fade_value)` — subtracts `fade_value` from every RGB channel (floor 0). Used for motion trails.
 - `hsv_to_rgb(h, s, v)` — HSV→RGB; `h` is in `[0.0, 1.0]`.
 
 #### Mutable shared state (list wrappers — updated in-place so `from … import *` sees changes)
 
-- `escape = [False]` — set to `[True]` by `display_frame()` when Esc/q pressed or window closed. Pattern loops check `escape[0]`.
-- `_disp_count = [0]` — frame counter inside `display_frame()`, used for progress printing every `FPS` frames.
+- `escape = [False]` — set `[True]` by `display_frame()` on Esc/q/close or when Save is triggered. Pattern loops check `escape[0]`.
+- `_pending_save = [False]` — set `[True]` when Save button/key is used. The `atexit` handler checks this and spawns the headless re-run.
+- `_disp_count = [0]` — frame counter inside `display_frame()`.
 
-#### Visualiser details (`display_frame`)
+#### GUI details (`display_frame`)
 
 - Renders 7 side panels side-by-side, separated by dark dividers.
 - Each panel labelled "Side 1"–"Side 7" in green (club colour) above the panel.
 - Dot size: radius 3 px (diameter 6 px), cell pitch 15 px — gap between dots = 9 px = 1.5× dot diameter, mimicking physical LED spacing.
-- Window flags: `WINDOW_GUI_NORMAL | WINDOW_FREERATIO` — no Qt toolbar/statusbar, image stretches to fill the window with no letterbox borders.
-- Default window size: 1400 × 600 (wide landscape for 7 panels).
+- Window flags: `WINDOW_GUI_NORMAL | WINDOW_FREERATIO` — no Qt toolbar/statusbar, image stretches to fill the window.
+- Default window size: 1400 × 640. Last-used size restored from `.window_config.json`.
+- **Button bar** (40 px below panels): frame counter on the left, blue "Save .tol [S]" button on the right. Turns green "Generating..." when triggered.
+
+#### Save flow
+
+1. User presses **S** or clicks the button → `_pending_save[0] = True`, `escape[0] = True`
+2. Animation loop exits, script runs its cleanup (`black_frame()`, tail `save_frame()` calls, `cv2.destroyAllWindows()`)
+3. `atexit` fires → spawns `python3 <script>.py --headless`
+4. Headless run regenerates every frame from scratch and writes the `.tol` file
+5. Terminal prints `✅ Saved → Tol files/<name>.tol`
 
 ### Pattern loop structure
 
@@ -106,7 +116,7 @@ while True and current_frame < FRAME_COUNT - 30:
 
 `SPEED` and `FADE` are the primary tuning knobs — expose them as named constants at the top of each script.
 
-`story.py` is the exception: it uses plain nested `for` loops (no busy-wait) since each frame is deterministic, not particle-based.
+`story.py` and `kovil_glow.py` are exceptions: they use plain nested `for` loops (no busy-wait) since each frame is deterministic, not particle-based.
 
 ### `.tol` binary format
 
@@ -119,7 +129,7 @@ while True and current_frame < FRAME_COUNT - 30:
 | 8–13 | `0x00 × 6` padding |
 | 14+ | Frame data — `HEIGHT × WIDTH × 3` bytes per frame, row-major, raw RGB |
 
-30 black frames prepended + 30 appended (fade-in/out on controller).
+30 black frames prepended + 30 appended (fade-in/out on controller). The tail frames should be a gradual fade to black (not an instant cut) to avoid a brightness flash on the hardware when the animation loops.
 
 ### Hardware context
 
@@ -132,26 +142,34 @@ while True and current_frame < FRAME_COUNT - 30:
 | Script | Effect | Key parameters |
 |--------|--------|---------------|
 | `hor_lines.py` | Green→white horizontal lines sweeping right | `SPEED`, `FADE`, `PARTICLE_COUNT` |
-| `rainy.py` | Green/white rainfall dripping down | `PARTICLE_COUNT`, fade = 25 |
+| `rainy.py` | Green/white rainfall — even panels fall down, odd panels fall up | `PARTICLE_COUNT`, fade = 25 |
 | `confetti.py` | Random green sparkle scatter | `PARTICLE_COUNT`, fade = 0.7 |
 | `falling_dots.py` | Rainbow columns falling downward | `PARTICLE_COUNT`, fade = 7 |
-| `tetris.py` | Coloured Tetris blocks falling and stacking | `DROP_COUNT` |
-| `story.py` | Scripted green/white/yellow panel wipe sequence | Hard-coded colour sequence |
+| `tetris.py` | 4×4 green/white/gold blocks falling and stacking per grid column | `MAX_ACTIVE` |
+| `story.py` | Scripted white/green panel wipe — 7 panels, alternating directions | Hard-coded colour sequence |
+| `kovil_glow.py` | Warm white & forest green panels with gold cross-fade transitions | `BEAT_PERIOD`, `PANEL_DELAY` |
+| `heartbeat.py` | Crimson→amber pulse wave travelling across 7 panels | `BEAT_PERIOD`, `PANEL_DELAY`, `MIN_BRIGHT` |
 
 ## Adding a New Pattern
 
 1. Create `Tol creator/mypattern.py`
-2. `from functions import *` — handles all init, file writing, and window setup
+2. `from functions import *` — handles all init, window setup, and headless detection
 3. Define `SPEED` and `FADE` constants at the top
 4. Implement the standard loop structure shown above
-5. End with:
+5. End with a gradual fade-to-black over the tail frames:
    ```python
-   black_frame()
-   for i in range(30):
+   import copy as _copy
+   _last = _copy.deepcopy(byte_array)
+   for _step in range(30):
+       _t = 1.0 - (_step + 1) / 30
+       for _y in range(HEIGHT):
+           for _x in range(WIDTH):
+               byte_array[_y][_x] = [int(_last[_y][_x][_c] * _t) for _c in range(3)]
        save_frame()
+   black_frame()
    cv2.destroyAllWindows()
    print("✅ Done")
    ```
-6. Run it — output goes directly to `Tol files/mypattern.tol`
+6. Run it → GUI opens for preview. Press **S** to save `Tol files/mypattern.tol`.
 
 **Do not** use the `keyboard` library — it requires root on Linux. Key detection is already handled inside `display_frame()` via `cv2.waitKey`.

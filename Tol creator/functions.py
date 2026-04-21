@@ -1,3 +1,4 @@
+import atexit
 import random
 import cv2
 import numpy as np
@@ -5,6 +6,8 @@ import time
 import sys
 import os
 import json
+
+_HEADLESS = '--headless' in sys.argv
 
 _script_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 _tol_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), '..', 'Tol files'))
@@ -20,6 +23,8 @@ def _load_win_config():
     return None
 
 def _save_win_config():
+    if _HEADLESS:
+        return
     try:
         rect = cv2.getWindowImageRect(_WIN_NAME)
         if rect[2] > 0 and rect[3] > 0:
@@ -31,7 +36,7 @@ def _save_win_config():
 HEIGHT          = 50
 SIDES           = 7
 STRIPS_PER_SIDE = 16
-WIDTH           = SIDES * STRIPS_PER_SIDE  # 112
+WIDTH           = SIDES * STRIPS_PER_SIDE   # 112
 
 FPS         = 30
 DURATION    = 30
@@ -45,25 +50,22 @@ _LABEL_H = 24
 _PANEL_W = STRIPS_PER_SIDE * _PX
 _FRAME_W = SIDES * _PANEL_W + (SIDES - 1) * _GAP
 _FRAME_H = HEIGHT * _PX + _LABEL_H
-_BTN_H   = 40                               # button bar below the animation
+_BTN_H   = 40
 _TOTAL_H = _FRAME_H + _BTN_H
 
-# --- save-button state ---
-_save_requested = [False]
-_save_flash     = [0]      # display-frame countdown for "Saved!" flash
+# --- shared mutable state ---
+escape        = [False]
+_disp_count   = [0]
+_pending_save = [False]    # set True when user clicks Save — atexit spawns headless run
+_save_flash   = [0]        # countdown for button feedback
+
+_save_requested = [False]  # internal: button click detected this frame
 
 def _on_mouse(event, x, y, _flags, _param):
     if event == cv2.EVENT_LBUTTONDOWN:
-        btn_x0 = _FRAME_W - 130
-        btn_x1 = _FRAME_W - 10
-        btn_y0 = _FRAME_H + 5
-        btn_y1 = _TOTAL_H - 5
-        if btn_x0 <= x <= btn_x1 and btn_y0 <= y <= btn_y1:
+        if (_FRAME_W - 130 <= x <= _FRAME_W - 10 and
+                _FRAME_H + 5 <= y <= _TOTAL_H - 5):
             _save_requested[0] = True
-
-# --- shared mutable state ---
-escape      = [False]
-_disp_count = [0]
 
 current_frame = 0
 pre_time      = 0
@@ -81,35 +83,25 @@ def fade_pixels(byte_array, fade_value):
             for c in range(3):
                 byte_array[y][x][c] = max(0, byte_array[y][x][c] - fade_value)
 
-# ---------- frame buffer (replaces per-frame file writes) ----------
-
-_frame_buffer = []
+# ---------- frame I/O ----------
 
 def save_frame():
-    raw = bytearray()
-    for row in byte_array:
-        for pixel in row:
-            raw.extend(int(min(255, max(0, p))) for p in pixel)
-    _frame_buffer.append(bytes(raw))
-
-def _write_tol():
-    n   = len(_frame_buffer)
-    hdr = bytearray(14)
-    hdr[0]   = 0x00
-    hdr[1:4] = n.to_bytes(3, 'big')
-    hdr[4:6] = HEIGHT.to_bytes(2, 'big')
-    hdr[6:8] = WIDTH.to_bytes(2, 'big')
-    with open(OUTPUT_FILE, 'wb') as f:
-        f.write(hdr)
-        for frame in _frame_buffer:
-            f.write(frame)
-    return n
-
-# ---------- display ----------
+    if not _HEADLESS:
+        return   # preview only — headless re-run does the real write
+    with open(OUTPUT_FILE, "ab") as f:
+        for row in byte_array:
+            for pixel in row:
+                f.write(bytes([int(min(255, max(0, p))) for p in pixel]))
 
 def display_frame():
     global pre_time
     pre_time = time.time()
+
+    if _HEADLESS:
+        _disp_count[0] += 1
+        if _disp_count[0] % FPS == 0:
+            print(f"  generating: {_disp_count[0]} / {FRAME_COUNT}", end="\r", flush=True)
+        return
 
     rgb_array = np.array(byte_array, dtype=np.uint8).reshape((HEIGHT, WIDTH, 3))
     canvas    = np.zeros((_TOTAL_H, _FRAME_W, 3), dtype=np.uint8)
@@ -137,19 +129,18 @@ def display_frame():
             sep_x = x_off + _PANEL_W + _GAP // 2
             cv2.line(canvas, (sep_x, 0), (sep_x, _FRAME_H), (50, 50, 50), 2)
 
-    # --- button bar ---
+    # button bar
     cv2.rectangle(canvas, (0, _FRAME_H), (_FRAME_W, _TOTAL_H), (28, 28, 28), -1)
-
-    info = f"Frame {_disp_count[0]} / {FRAME_COUNT}    buffered: {len(_frame_buffer)}"
-    cv2.putText(canvas, info, (10, _FRAME_H + 27),
+    cv2.putText(canvas, f"Frame {_disp_count[0]} / {FRAME_COUNT}",
+                (10, _FRAME_H + 27),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.44, (140, 140, 140), 1, cv2.LINE_AA)
 
     if _save_flash[0] > 0:
-        btn_col  = (0, 160, 0)
-        btn_text = "Saved!"
+        btn_col  = (30, 140, 30)
+        btn_text = "Generating..."
         _save_flash[0] -= 1
     else:
-        btn_col  = (180, 80, 30)
+        btn_col  = (40, 100, 200)
         btn_text = "Save .tol  [S]"
 
     cv2.rectangle(canvas,
@@ -163,12 +154,11 @@ def display_frame():
 
     _disp_count[0] += 1
 
-    # handle pending save
     if _save_requested[0]:
         _save_requested[0] = False
-        n = _write_tol()
-        _save_flash[0] = FPS * 2
-        print(f"\n💾  Saved {n} frames → {OUTPUT_FILE}")
+        _pending_save[0]   = True
+        _save_flash[0]     = FPS
+        escape[0]          = True   # stop animation; atexit will spawn headless run
 
     cv2.imshow(_WIN_NAME, canvas)
     key = cv2.waitKey(1) & 0xFF
@@ -176,7 +166,9 @@ def display_frame():
         _save_win_config()
         escape[0] = True
     elif key == ord('s'):
-        _save_requested[0] = True
+        _pending_save[0] = True
+        _save_flash[0]   = FPS
+        escape[0]        = True
     if cv2.getWindowProperty(_WIN_NAME, cv2.WND_PROP_VISIBLE) < 1:
         _save_win_config()
         escape[0] = True
@@ -186,23 +178,47 @@ def black_frame():
     _save_win_config()
     byte_array = [[[0 for _ in range(3)] for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
+# ---------- atexit: headless re-run ----------
+
+def _on_exit():
+    if not _pending_save[0] or _HEADLESS:
+        return
+    import subprocess
+    print(f"\n⚙️  Rendering '{_script_name}.tol' — please wait...")
+    result = subprocess.run([sys.executable, sys.argv[0], '--headless'])
+    if result.returncode == 0:
+        print(f"✅  Saved → {OUTPUT_FILE}")
+    else:
+        print("❌  Render failed")
+
+atexit.register(_on_exit)
+
 # ---------- init ----------
 
 byte_array = [[[0 for _ in range(3)] for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
-cv2.namedWindow(_WIN_NAME, cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FREERATIO)
-cv2.setMouseCallback(_WIN_NAME, _on_mouse)
-_cfg   = _load_win_config()
-_win_w = _cfg['w'] if _cfg else 1400
-_win_h = _cfg['h'] if _cfg else 640
-cv2.resizeWindow(_WIN_NAME, _win_w, _win_h)
-cv2.imshow(_WIN_NAME, np.zeros((_TOTAL_H, _FRAME_W, 3), dtype=np.uint8))
-cv2.waitKey(1)
-
-# buffer 30 lead-in black frames (no disk write)
-_black_raw = bytes(HEIGHT * WIDTH * 3)
-for _i in range(30):
-    _frame_buffer.append(_black_raw)
+if _HEADLESS:
+    # write .tol header + 30 lead-in black frames up front
+    hdr = bytearray(14)
+    hdr[1:4] = FRAME_COUNT.to_bytes(3, 'big')
+    hdr[4:6] = HEIGHT.to_bytes(2, 'big')
+    hdr[6:8] = WIDTH.to_bytes(2, 'big')
+    with open(OUTPUT_FILE, 'wb') as f:
+        f.write(hdr)
+    _black_row = bytes(WIDTH * 3)
+    with open(OUTPUT_FILE, 'ab') as f:
+        for _ in range(30):
+            for _ in range(HEIGHT):
+                f.write(_black_row)
+else:
+    cv2.namedWindow(_WIN_NAME, cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FREERATIO)
+    cv2.setMouseCallback(_WIN_NAME, _on_mouse)
+    _cfg   = _load_win_config()
+    _win_w = _cfg['w'] if _cfg else 1400
+    _win_h = _cfg['h'] if _cfg else 640
+    cv2.resizeWindow(_WIN_NAME, _win_w, _win_h)
+    cv2.imshow(_WIN_NAME, np.zeros((_TOTAL_H, _FRAME_W, 3), dtype=np.uint8))
+    cv2.waitKey(1)
 
 def hsv_to_rgb(h, s, v):
     if s == 0.0:
