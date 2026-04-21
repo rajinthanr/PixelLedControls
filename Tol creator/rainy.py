@@ -1,10 +1,28 @@
 from functions import *
 
 
-PARTICLE_COUNT = 1000  
+PARTICLE_COUNT = 1000
 
-drops = [random.randint(-HEIGHT, 0) for _ in range(PARTICLE_COUNT)]
+
+def _panel(x):
+    return x // STRIPS_PER_SIDE
+
+
+def reset_drop(i):
+    x_positions[i] = random.randint(0, WIDTH - 1)
+    if _panel(x_positions[i]) % 2 == 1:
+        drops[i]      = float(random.randint(HEIGHT, HEIGHT + 20))
+        directions[i] = -1   # upward
+    else:
+        drops[i]      = float(random.randint(-20, 0))
+        directions[i] =  1   # downward
+
+
 x_positions = [random.randint(0, WIDTH - 1) for _ in range(PARTICLE_COUNT)]
+directions  = [-1 if _panel(x) % 2 == 1 else 1 for x in x_positions]
+drops       = [float(random.randint(HEIGHT, HEIGHT + 20)) if d == -1
+               else float(random.randint(-HEIGHT, 0))
+               for d in directions]
 
 current_frame = 30
 while True and current_frame < FRAME_COUNT-30:
@@ -12,11 +30,10 @@ while True and current_frame < FRAME_COUNT-30:
     if(count-pTloop<30):
         if(count-pre_time>(1000/30)):
             current_frame += 1
-            save_frame() #save the current frame to the tol file
-            display_frame() # Display the current frame on window
-
+            save_frame()
+            display_frame()
             pre_time = count
-            fade_pixels(byte_array, 25)  # Fade all pixels by 10
+            fade_pixels(byte_array, 25)
         continue
 
     pTloop = count
@@ -24,28 +41,25 @@ while True and current_frame < FRAME_COUNT-30:
     for i in range(PARTICLE_COUNT):
         y = int(drops[i])
         x = x_positions[i]
+        d = directions[i]
 
-        # Draw the raindrop as a single pixel
-        
-        if(x%2):
-            color = [255, 255, 255]  
+        if x % 2:
+            color = [255, 255, 255]
         else:
             color = [0, 255, 0]
+
         for j in range(3):
             for b in range(3):
-                if 0 <= y+b < HEIGHT:
-                    byte_array[y+b][x][j] += int(color[j]*0.7)
-                    byte_array[y+b][x][j] = min(255, byte_array[y+b][x][j])
-            
-            #draw.point((x, y), fill=color)
+                ty = y + b * d   # trail follows direction of travel
+                if 0 <= ty < HEIGHT:
+                    byte_array[ty][x][j] = min(255, byte_array[ty][x][j] + int(color[j] * 0.7))
 
-        # Move the raindrop down
-        drops[i] += 0.3
+        drops[i] += 0.3 * d
 
-        # If the raindrop goes beyond the bottom, reset it at a random position
-        if drops[i] >= HEIGHT and current_frame < FRAME_COUNT-120:
-            drops[i] = random.randint(-20, 0)
-            x_positions[i] = random.randint(0, WIDTH - 1)
+        if d == 1 and drops[i] >= HEIGHT and current_frame < FRAME_COUNT - 120:
+            reset_drop(i)
+        elif d == -1 and drops[i] < 0 and current_frame < FRAME_COUNT - 120:
+            reset_drop(i)
     
     
 

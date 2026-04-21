@@ -1,102 +1,94 @@
 from functions import *
 
+BLOCK_SIZE   = 4
+NUM_COLS     = WIDTH // BLOCK_SIZE   # 28 grid columns
+MAX_ACTIVE   = 20                     # simultaneous falling blocks
 
-# Define Tetris block shapes
-
-# Define Tetris block shapes and their corresponding colors
-TETRIS_SHAPES = [
-    [[1, 1, 1, 1]],  # Line
-    [[1, 1], [1, 1]],  # S\quare
-    [[0, 1, 0], [1, 1, 1]],  # T-shape
-    [[1, 1, 0], [0, 1, 1]],  # Z-shape
-    [[0, 1, 1], [1, 1, 0]]   # S-shape
+BLOCK_COLORS = [
+    [0,   200, 0  ],   # green
+    [255, 255, 240],   # warm white
+    [255, 215, 0  ],   # gold
 ]
 
-TETRIS_COLORS = [
-    [255, 0, 0],  # Red for Line
-    [0, 255, 0],  # Green for Square
-    [0, 0, 255],  # Blue for T-shape
-    [255, 255, 0],  # Yellow for Z-shape
-    [255, 0, 255]   # Magenta for S-shape
-]
+# col_height[c] = y of the top of the stack in grid column c (HEIGHT = empty floor)
+col_height  = [HEIGHT] * NUM_COLS
+# grid_colors[y][x] stores the landed pixel colour, or None if empty
+grid_colors = [[None] * WIDTH for _ in range(HEIGHT)]
 
-# Initialize Tetris blocks and their colors
-DROP_COUNT = 200  # Number of blocks to drop
-blocks = [random.choice(TETRIS_SHAPES) for _ in range(DROP_COUNT)]
-block_colors = [TETRIS_COLORS[TETRIS_SHAPES.index(block)] for block in blocks]
-block_positions = [(random.randint(0, WIDTH - len(blocks[i][0])), random.randint(-HEIGHT, 0)) for i in range(DROP_COUNT)]
 
-grid = [[0 for _ in range(WIDTH)] for _ in range(HEIGHT)]  # Initialize the grid
+def spawn_block():
+    free = [c for c in range(NUM_COLS) if col_height[c] > BLOCK_SIZE]
+    if not free:
+        return None
+    col   = random.choice(free)
+    color = random.choice(BLOCK_COLORS)
+    return {'col': col, 'y': -BLOCK_SIZE, 'color': list(color)}
 
-# Main loop
+
+def land_block(b):
+    col    = b['col']
+    land_y = col_height[col] - BLOCK_SIZE
+    if land_y < 0:
+        return
+    for y in range(land_y, land_y + BLOCK_SIZE):
+        for x in range(col * BLOCK_SIZE, (col + 1) * BLOCK_SIZE):
+            if 0 <= y < HEIGHT:
+                grid_colors[y][x] = b['color']
+    col_height[col] = land_y
+
+
+def render():
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
+            byte_array[y][x] = list(grid_colors[y][x]) if grid_colors[y][x] else [0, 0, 0]
+    for b in active_blocks:
+        if b is None:
+            continue
+        y0 = int(b['y'])
+        for dy in range(BLOCK_SIZE):
+            py = y0 + dy
+            if 0 <= py < HEIGHT:
+                for x in range(b['col'] * BLOCK_SIZE, (b['col'] + 1) * BLOCK_SIZE):
+                    byte_array[py][x] = list(b['color'])
+
+
+active_blocks = [spawn_block() for _ in range(MAX_ACTIVE)]
+
+current_frame = 30
 while True and current_frame < FRAME_COUNT - 30:
     count += 1
-    if count - pTloop < 60:
+    if count - pTloop < 90:
         if count - pre_time > (1000 / 30):
             current_frame += 1
-
-            for row in range(len(grid)):
-                for j in range(len(grid[0])):
-                    if grid[row][j] == 1:
-                        byte_array[row][j] = [255, 255, 255]  # Reset the color to black
-
-            save_frame()  # Save the current frame to the tol file
-            display_frame()  # Display the current frame on window
-
+            render()
+            save_frame()
+            display_frame()
             pre_time = count
         continue
 
     pTloop = count
-    fade_pixels(byte_array, 255) 
-    for i in range(DROP_COUNT):
-        block = blocks[i]
-        color = block_colors[i]
-        x, y = block_positions[i]
-
-        # Check if the block can move down
-        can_move_down = True
-        for row_idx, row in enumerate(block):
-            for col_idx, cell in enumerate(row):
-                if cell == 1:
-                    px, py = x + col_idx, y + row_idx
-                    if py + 1 >= HEIGHT or (py + 1 >= 0 and grid[py + 1][px] == 1):
-                        can_move_down = False
-
-        if can_move_down:
-            # Move the block down
-            block_positions[i] = (x, y + 1)
-            for row_idx, row in enumerate(block):
-                for col_idx, cell in enumerate(row):      
-                    px, py = x + col_idx, y + row_idx
-                    if cell == 1 and (py >= 0):
-                        for j in range(3):
-                            byte_array[py][px][j] = color[j]
-
-        else:
-            # Mark the block's cells as occupied in the grid
-            for row_idx, row in enumerate(block):
-                for col_idx, cell in enumerate(row):
-                    if cell == 1:
-                        px, py = x + col_idx, y + row_idx
-                        if 0 <= py < HEIGHT and 0 <= px < WIDTH:
-                            grid[py][px] = 1
-                            for j in range(3):
-                                byte_array[py][px][j] = color[j]
-
-            # Reset the block to a new random position and color
-            blocks[i] = random.choice(TETRIS_SHAPES)
-            block_colors[i] = TETRIS_COLORS[TETRIS_SHAPES.index(blocks[i])]
-            block_positions[i] = (random.randint(0, WIDTH - len(blocks[i][0])), random.randint(-20, 0))
 
     if escape[0]:
         break
 
-black_frame()  # Clear the screen
+    to_replace = []
+    for i, b in enumerate(active_blocks):
+        if b is None:
+            to_replace.append(i)
+            continue
+        b['y'] += 1
+        if b['y'] + BLOCK_SIZE >= col_height[b['col']]:
+            b['y'] = col_height[b['col']] - BLOCK_SIZE   # snap to grid
+            land_block(b)
+            to_replace.append(i)
+
+    for i in to_replace:
+        active_blocks[i] = spawn_block()
+
+
+black_frame()
 for i in range(30):
-    save_frame()  # Save the last frame to the tol file
+    save_frame()
 
 cv2.destroyAllWindows()
-
-# Write to custom file
-
 print("✅ Hex values written to output.tol")
