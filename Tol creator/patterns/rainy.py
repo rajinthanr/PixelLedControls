@@ -26,8 +26,8 @@ drops       = [float(random.randint(HEIGHT, HEIGHT + 20)) if d == -1
                else float(random.randint(-HEIGHT, 0))
                for d in directions]
 
-current_frame = 30
-while True and current_frame < FRAME_COUNT-30:
+current_frame = LEAD_FRAMES
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count+=1
     if(count-pTloop<30):
         if(count-pre_time>(1000/30)):

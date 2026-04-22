@@ -14,7 +14,7 @@ TRAIL_LEN     = 12    # green trail length above the head (pixels)
 drops       = [random.uniform(-HEIGHT, 0) for _ in range(PARTICLE_COUNT)]
 x_positions = [random.randint(0, WIDTH - 1) for _ in range(PARTICLE_COUNT)]
 
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):

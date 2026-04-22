@@ -11,7 +11,7 @@ PARTICLE_COUNT = 500
 particles = [(random.randint(0, WIDTH - 1), random.randint(0, HEIGHT)) for _ in range(PARTICLE_COUNT)]
 
 # Main loop
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):

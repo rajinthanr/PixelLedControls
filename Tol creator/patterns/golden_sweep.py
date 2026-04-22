@@ -17,7 +17,7 @@ SWEEP_FREQ = 0.038  # sine oscillation speed — lower = slower, more majestic s
 
 sweep_t = 0.0
 
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):

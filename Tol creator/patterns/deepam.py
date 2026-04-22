@@ -17,7 +17,7 @@ SPARK_PROB  = 0.25  # probability a column throws a spark above the tip each ste
 col_phase = [random.uniform(0, 2 * math.pi) for _ in range(WIDTH)]
 time_t    = 0.0
 
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):

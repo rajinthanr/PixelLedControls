@@ -56,8 +56,8 @@ def render():
 
 active_blocks = [spawn_block() for _ in range(MAX_ACTIVE)]
 
-current_frame = 30
-while True and current_frame < FRAME_COUNT - 30:
+current_frame = LEAD_FRAMES
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < 90:
         if count - pre_time > (1000 / 30):

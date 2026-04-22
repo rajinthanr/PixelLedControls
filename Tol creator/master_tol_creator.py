@@ -217,10 +217,18 @@ class MasterTolCreator:
     def _toggle_preview(self, name):
         proc = self._preview_procs.get(name)
         if proc and proc.poll() is None:
+            # clicking the stop button for the currently playing animation
             proc.terminate()
             self._preview_procs.pop(name, None)
             self._set_btn_play(name)
         else:
+            # stop any other running previews first
+            for other_name, other_proc in list(self._preview_procs.items()):
+                if other_proc.poll() is None:
+                    other_proc.terminate()
+                self._preview_procs.pop(other_name, None)
+                self._set_btn_play(other_name)
+
             script = os.path.join(PATTERNS_DIR, f"{name}.py")
             if not os.path.exists(script):
                 return

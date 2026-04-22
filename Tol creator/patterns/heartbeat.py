@@ -16,7 +16,7 @@ CENTER_X = WIDTH // 2   # column 56 — center of Side 4
 pulse_r = 0.0
 max_r   = WIDTH // 2 + PULSE_THICK   # past the outermost column
 
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):

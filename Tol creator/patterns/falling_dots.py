@@ -13,7 +13,7 @@ PARTICLE_COUNT = 300  # Number of confetti particles
 particles =  [random.randint(0, HEIGHT-1) for _ in range(PARTICLE_COUNT)]
 
 # Main loop
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < 60:
         if count - pre_time > (1000 / 30):

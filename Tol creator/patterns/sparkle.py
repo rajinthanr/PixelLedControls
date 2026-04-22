@@ -14,7 +14,7 @@ BREATH_SPEED  = 0.05  # breathing frequency — higher = faster pulse
 breath_phase = 0.0
 sparkles = {}   # {(x, y): remaining_life}
 
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):

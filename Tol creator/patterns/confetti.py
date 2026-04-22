@@ -14,7 +14,7 @@ particles = [(random.randint(0, WIDTH - 1), random.randint(-HEIGHT, 0)) for _ in
 particle_hues = [random.randint(0, 360) for _ in range(PARTICLE_COUNT)]  # Store hues for particles
 
 # Main loop
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < 30:
         if count - pre_time > (1000 / 30):

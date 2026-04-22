@@ -17,12 +17,12 @@ FILL_DOWN   = [s % 2 == 0 for s in range(SIDES)]
 ODD_SIDES  = [s for s in range(SIDES) if s % 2 == 1]
 EVEN_SIDES = [s for s in range(SIDES) if s % 2 == 0]
 
-current_frame = 30
+current_frame = LEAD_FRAMES
 
 
 def save_display():
     global current_frame
-    if escape[0] or current_frame >= FRAME_COUNT - 30:
+    if escape[0] or current_frame >= FRAME_COUNT - TAIL_FRAMES:
         return
     current_frame += 1
     save_frame()
@@ -81,7 +81,7 @@ def hold(frames=20):
 fill_group(list(range(SIDES)))
 hold(20)
 
-while not escape[0] and current_frame < FRAME_COUNT - 30:
+while not escape[0] and current_frame < FRAME_COUNT - TAIL_FRAMES:
     # Fade through gold → dim for odd panels; even panels stay lit
     gold_fade(ODD_SIDES)
     hold(10)

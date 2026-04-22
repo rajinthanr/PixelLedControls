@@ -38,10 +38,12 @@ SIDES           = 7
 STRIPS_PER_SIDE = 16
 WIDTH           = SIDES * STRIPS_PER_SIDE   # 112
 
-FPS         = 30
-DURATION    = 30
-FRAME_COUNT = FPS * DURATION + 30 + 30
-DROP_COUNT  = 400
+FPS          = 30
+DURATION     = 60
+LEAD_FRAMES  = 60   # 2 s black lead-in
+TAIL_FRAMES  = 60   # 2 s black tail
+FRAME_COUNT  = FPS * DURATION + LEAD_FRAMES + TAIL_FRAMES
+DROP_COUNT   = 400
 
 _DOT_R   = 3
 _PX      = int(_DOT_R * 2 * 2.5)           # cell pitch 15 px
@@ -90,8 +92,7 @@ def save_frame():
     if not _HEADLESS:
         return   # preview only — headless re-run does the real write
     _write_count[0] += 1
-    # linear fade-in over the first 30 frames written
-    scale = min(1.0, _write_count[0] / 30)
+    scale = min(1.0, _write_count[0] / LEAD_FRAMES)   # fade-in over first 2 s
     with open(OUTPUT_FILE, "ab") as f:
         for row in byte_array:
             for pixel in row:
@@ -121,6 +122,11 @@ def display_frame():
                     cv2.circle(canvas, (cx, cy), _DOT_R, color.tolist(), -1)
 
     canvas = cv2.cvtColor(canvas, cv2.COLOR_RGB2BGR)
+
+    # fade-in: scale the LED area up from black over the first LEAD_FRAMES display frames
+    fade_scale = min(1.0, _disp_count[0] / LEAD_FRAMES)
+    if fade_scale < 1.0:
+        canvas[:_FRAME_H] = (canvas[:_FRAME_H] * fade_scale).astype(np.uint8)
 
     for side in range(SIDES):
         x_off = side * (_PANEL_W + _GAP)
@@ -233,7 +239,7 @@ if _HEADLESS:
         f.write(hdr)
     _black_row = bytes(WIDTH * 3)
     with open(OUTPUT_FILE, 'ab') as f:
-        for _ in range(30):
+        for _ in range(LEAD_FRAMES):
             for _ in range(HEIGHT):
                 f.write(_black_row)
 else:

@@ -16,7 +16,7 @@ GOLD  = [255, 215,  0]    # Gold leading edge #FFD700
 # Space bands evenly across the grid
 band_x = [i * (WIDTH // NUM_BANDS) for i in range(NUM_BANDS)]
 
-while True and current_frame < FRAME_COUNT - 30:
+while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
     if count - pTloop < SPEED:
         if count - pre_time > (1000 / 30):
