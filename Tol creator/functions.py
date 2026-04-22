@@ -29,7 +29,7 @@ def _save_win_config():
         rect = cv2.getWindowImageRect(_WIN_NAME)
         if rect[2] > 0 and rect[3] > 0:
             with open(_WIN_CONFIG, 'w') as f:
-                json.dump({'w': rect[2], 'h': rect[3]}, f)
+                json.dump({'x': rect[0], 'y': rect[1], 'w': rect[2], 'h': rect[3]}, f)
     except Exception:
         pass
 
@@ -157,6 +157,8 @@ def display_frame():
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
     _disp_count[0] += 1
+    if _disp_count[0] % 60 == 0:
+        _save_win_config()   # keep position/size fresh for close-button saves
 
     if _save_requested[0]:
         _save_requested[0] = False
@@ -241,6 +243,8 @@ else:
     _win_w = _cfg['w'] if _cfg else 1400
     _win_h = _cfg['h'] if _cfg else 640
     cv2.resizeWindow(_WIN_NAME, _win_w, _win_h)
+    if _cfg and 'x' in _cfg and 'y' in _cfg:
+        cv2.moveWindow(_WIN_NAME, _cfg['x'], _cfg['y'])
     cv2.imshow(_WIN_NAME, np.zeros((_TOTAL_H, _FRAME_W, 3), dtype=np.uint8))
     cv2.waitKey(1)
 
