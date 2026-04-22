@@ -200,9 +200,13 @@ byte_array = [[[0 for _ in range(3)] for _ in range(WIDTH)] for _ in range(HEIGH
 if _HEADLESS:
     # write .tol header + 30 lead-in black frames up front
     hdr = bytearray(14)
-    hdr[1:4] = FRAME_COUNT.to_bytes(3, 'big')
-    hdr[4:6] = HEIGHT.to_bytes(2, 'big')
-    hdr[6:8] = WIDTH.to_bytes(2, 'big')
+    hdr[1:4]  = FRAME_COUNT.to_bytes(3, 'big')
+    hdr[4:6]  = HEIGHT.to_bytes(2, 'big')
+    hdr[6:8]  = WIDTH.to_bytes(2, 'big')
+    hdr[8:10]  = (10).to_bytes(2, 'big')   # frame delay ms — matches LEDEdit sample files
+    hdr[10:12] = (10).to_bytes(2, 'big')   # duplicate of bytes 8-9
+    hdr[12]    = 0x03                       # RGB colour channels
+    hdr[13]    = 0x01                       # loop mode
     with open(OUTPUT_FILE, 'wb') as f:
         f.write(hdr)
     _black_row = bytes(WIDTH * 3)
