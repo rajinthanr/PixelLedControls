@@ -169,14 +169,23 @@ class MasterTolCreator:
         btn_row = tk.Frame(right, bg=_DARK)
         btn_row.grid(row=1, column=0, sticky="ew", pady=4)
 
-        self.run_btn = tk.Button(
-            btn_row, text="▶  Generate Selected",
+        self.run_tol_btn = tk.Button(
+            btn_row, text="▶  Generate .tol",
             font=("Segoe UI", 11, "bold"),
             bg="#005522", fg="white", activebackground="#007733",
             relief="flat", cursor="hand2",
-            command=self._start_generation, width=22
+            command=self._start_tol, width=18
         )
-        self.run_btn.pack(side="left", padx=(0, 8))
+        self.run_tol_btn.pack(side="left", padx=(0, 6))
+
+        self.run_avi_btn = tk.Button(
+            btn_row, text="▶  Generate .avi",
+            font=("Segoe UI", 11, "bold"),
+            bg="#00555a", fg="white", activebackground="#007a82",
+            relief="flat", cursor="hand2",
+            command=self._start_avi, width=18
+        )
+        self.run_avi_btn.pack(side="left", padx=(0, 8))
 
         self.stop_btn = tk.Button(
             btn_row, text="■  Stop",
@@ -284,20 +293,27 @@ class MasterTolCreator:
 
     # ── generation ───────────────────────────────────────────────────────────
 
-    def _start_generation(self):
+    def _start_tol(self):
+        self._start_generation("--headless")
+
+    def _start_avi(self):
+        self._start_generation("--avi")
+
+    def _start_generation(self, flag):
         selected = [name for name, var in self.checks.items() if var.get()]
         if not selected:
             self._log("No patterns selected.", "err")
             return
 
         self.running = True
-        self.run_btn.config(state="disabled")
+        self.run_tol_btn.config(state="disabled")
+        self.run_avi_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         self.progress["value"] = 0
         self.progress["maximum"] = len(selected)
 
         threading.Thread(target=self._run_patterns,
-                         args=(selected,), daemon=True).start()
+                         args=(selected, flag), daemon=True).start()
 
     def _stop_generation(self):
         self.running = False
@@ -306,13 +322,14 @@ class MasterTolCreator:
             self.log_queue.put(("⚠  Generation stopped by user.", "err"))
         self._generation_done()
 
-    def _run_patterns(self, selected):
+    def _run_patterns(self, selected, flag):
         python = sys.executable
         total  = len(selected)
         done   = 0
         failed = []
+        ext    = ".tol" if flag == "--headless" else ".avi"
 
-        self.log_queue.put((f"Starting generation of {total} pattern(s)…", "head"))
+        self.log_queue.put((f"Starting generation of {total} pattern(s) [{ext}]…", "head"))
 
         for name in selected:
             if not self.running:
@@ -330,7 +347,7 @@ class MasterTolCreator:
 
             try:
                 proc = subprocess.Popen(
-                    [python, script, "--headless"],
+                    [python, script, flag],
                     cwd=PATTERNS_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -348,7 +365,7 @@ class MasterTolCreator:
 
                 proc.wait()
                 if proc.returncode == 0:
-                    self.log_queue.put((f"  ✅ {name}.tol saved", "ok"))
+                    self.log_queue.put((f"  ✅ {name}{ext} saved", "ok"))
                 else:
                     self.log_queue.put((f"  ✗ {name} exited with code {proc.returncode}", "err"))
                     failed.append(name)
@@ -374,7 +391,8 @@ class MasterTolCreator:
     def _generation_done(self):
         self.running      = False
         self.current_proc = None
-        self.run_btn.config(state="normal")
+        self.run_tol_btn.config(state="normal")
+        self.run_avi_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
         self.status_var.set("Done.")
 

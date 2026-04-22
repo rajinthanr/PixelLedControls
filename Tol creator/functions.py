@@ -8,13 +8,18 @@ import os
 import json
 
 _HEADLESS = '--headless' in sys.argv
+_AVI_MODE = '--avi'      in sys.argv
 
 _script_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-_tol_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Tol files'))
+_base_dir    = os.path.dirname(os.path.abspath(__file__))
+
+_tol_dir = os.path.normpath(os.path.join(_base_dir, '..', 'Tol files'))
+_avi_dir = os.path.normpath(os.path.join(_base_dir, '..', 'Avi files'))
 OUTPUT_FILE = os.path.join(_tol_dir, _script_name + '.tol')
+AVI_FILE    = os.path.join(_avi_dir,  _script_name + '.avi')
 
 _WIN_NAME   = "RGB Animation"
-_WIN_CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.window_config.json')
+_WIN_CONFIG = os.path.join(_base_dir, '.window_config.json')
 
 def _load_win_config():
     if os.path.exists(_WIN_CONFIG):
@@ -23,7 +28,7 @@ def _load_win_config():
     return None
 
 def _save_win_config():
-    if _HEADLESS:
+    if _HEADLESS or _AVI_MODE:
         return
     try:
         rect = cv2.getWindowImageRect(_WIN_NAME)
@@ -46,7 +51,7 @@ FRAME_COUNT  = FPS * DURATION + LEAD_FRAMES + TAIL_FRAMES
 DROP_COUNT   = 400
 
 _DOT_R   = 3
-_PX      = int(_DOT_R * 2 * 2.5)           # cell pitch 15 px
+_PX      = int(_DOT_R * 2 * 2.5)
 _GAP     = 10
 _LABEL_H = 24
 _PANEL_W = STRIPS_PER_SIDE * _PX
@@ -56,19 +61,27 @@ _BTN_H   = 40
 _TOTAL_H = _FRAME_H + _BTN_H
 
 # --- shared mutable state ---
-escape        = [False]
-_disp_count   = [0]
-_pending_save = [False]    # set True when user clicks Save — atexit spawns headless run
-_save_flash   = [0]        # countdown for button feedback
-_write_count  = [0]        # counts save_frame() calls; used for fade-in scaling
-
-_save_requested = [False]  # internal: button click detected this frame
+escape         = [False]
+_disp_count    = [0]
+_write_count   = [0]
+_pending_save  = [False]
+_pending_avi   = [False]
+_save_flash    = [0]
+_avi_flash     = [0]
+_save_requested = [False]
+_avi_requested  = [False]
+_avi_writer     = [None]
 
 def _on_mouse(event, x, y, _flags, _param):
-    if event == cv2.EVENT_LBUTTONDOWN:
-        if (_FRAME_W - 130 <= x <= _FRAME_W - 10 and
-                _FRAME_H + 5 <= y <= _TOTAL_H - 5):
-            _save_requested[0] = True
+    if event != cv2.EVENT_LBUTTONDOWN:
+        return
+    by0, by1 = _FRAME_H + 5, _TOTAL_H - 5
+    if not (by0 <= y <= by1):
+        return
+    if _FRAME_W - 130 <= x <= _FRAME_W - 10:
+        _save_requested[0] = True
+    elif _FRAME_W - 270 <= x <= _FRAME_W - 140:
+        _avi_requested[0] = True
 
 current_frame = 0
 pre_time      = 0
@@ -90,27 +103,17 @@ def fade_pixels(byte_array, fade_value):
 
 def save_frame():
     if not _HEADLESS:
-        return   # preview only — headless re-run does the real write
+        return
     _write_count[0] += 1
-    scale = min(1.0, _write_count[0] / LEAD_FRAMES)   # fade-in over first 2 s
+    scale = min(1.0, _write_count[0] / LEAD_FRAMES)
     with open(OUTPUT_FILE, "ab") as f:
         for row in byte_array:
             for pixel in row:
                 f.write(bytes([int(min(255, max(0, p)) * scale) for p in pixel]))
 
-def display_frame():
-    global pre_time
-    pre_time = time.time()
-
-    if _HEADLESS:
-        _disp_count[0] += 1
-        if _disp_count[0] % FPS == 0:
-            print(f"  generating: {_disp_count[0]} / {FRAME_COUNT}", end="\r", flush=True)
-        return
-
-    rgb_array = np.array(byte_array, dtype=np.uint8).reshape((HEIGHT, WIDTH, 3))
-    canvas    = np.zeros((_TOTAL_H, _FRAME_W, 3), dtype=np.uint8)
-
+def _render_anim_canvas():
+    rgb_array   = np.array(byte_array, dtype=np.uint8).reshape((HEIGHT, WIDTH, 3))
+    anim_canvas = np.zeros((_FRAME_H, _FRAME_W, 3), dtype=np.uint8)
     for side in range(SIDES):
         x_off = side * (_PANEL_W + _GAP)
         for y in range(HEIGHT):
@@ -119,58 +122,94 @@ def display_frame():
                 if np.any(color):
                     cx = x_off + x * _PX + _PX // 2
                     cy = _LABEL_H + y * _PX + _PX // 2
-                    cv2.circle(canvas, (cx, cy), _DOT_R, color.tolist(), -1)
-
-    canvas = cv2.cvtColor(canvas, cv2.COLOR_RGB2BGR)
-
-    # fade-in: scale the LED area up from black over the first LEAD_FRAMES display frames
-    fade_scale = min(1.0, _disp_count[0] / LEAD_FRAMES)
+                    cv2.circle(anim_canvas, (cx, cy), _DOT_R, color.tolist(), -1)
+    anim_canvas = cv2.cvtColor(anim_canvas, cv2.COLOR_RGB2BGR)
+    fade_scale  = min(1.0, _disp_count[0] / LEAD_FRAMES)
     if fade_scale < 1.0:
-        canvas[:_FRAME_H] = (canvas[:_FRAME_H] * fade_scale).astype(np.uint8)
-
+        anim_canvas = (anim_canvas * fade_scale).astype(np.uint8)
     for side in range(SIDES):
         x_off = side * (_PANEL_W + _GAP)
         label = f"Side {side + 1}"
         (tw, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)
-        cv2.putText(canvas, label,
+        cv2.putText(anim_canvas, label,
                     (x_off + (_PANEL_W - tw) // 2, _LABEL_H - 6),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 255, 0), 1, cv2.LINE_AA)
         if side < SIDES - 1:
             sep_x = x_off + _PANEL_W + _GAP // 2
-            cv2.line(canvas, (sep_x, 0), (sep_x, _FRAME_H), (50, 50, 50), 2)
+            cv2.line(anim_canvas, (sep_x, 0), (sep_x, _FRAME_H), (50, 50, 50), 2)
+    return anim_canvas
 
-    # button bar
+def display_frame():
+    global pre_time
+    pre_time = time.time()
+
+    if _HEADLESS:
+        _disp_count[0] += 1
+        if _disp_count[0] % FPS == 0:
+            print(f"  generating .tol: {_disp_count[0]} / {FRAME_COUNT}", end="\r", flush=True)
+        return
+
+    anim_canvas = _render_anim_canvas()
+    _disp_count[0] += 1
+
+    if _AVI_MODE:
+        if _avi_writer[0] is not None:
+            scale = min(1.0, _disp_count[0] / LEAD_FRAMES)
+            raw = np.array(byte_array, dtype=np.uint8).reshape((HEIGHT, WIDTH, 3))
+            if scale < 1.0:
+                raw = (raw * scale).astype(np.uint8)
+            _avi_writer[0].write(cv2.cvtColor(raw, cv2.COLOR_RGB2BGR))
+        if _disp_count[0] % FPS == 0:
+            print(f"  rendering .avi: {_disp_count[0]} / {FRAME_COUNT}", end="\r", flush=True)
+        return
+
+    # --- GUI mode ---
+    canvas = np.zeros((_TOTAL_H, _FRAME_W, 3), dtype=np.uint8)
+    canvas[:_FRAME_H] = anim_canvas
+
+    # button bar background
     cv2.rectangle(canvas, (0, _FRAME_H), (_FRAME_W, _TOTAL_H), (28, 28, 28), -1)
     cv2.putText(canvas, f"Frame {_disp_count[0]} / {FRAME_COUNT}",
                 (10, _FRAME_H + 27),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.44, (140, 140, 140), 1, cv2.LINE_AA)
 
+    # Save .avi button
+    if _avi_flash[0] > 0:
+        avi_col, avi_txt = (30, 140, 30), "Rendering..."
+        _avi_flash[0] -= 1
+    else:
+        avi_col, avi_txt = (0, 130, 110), "Save .avi  [A]"
+    cv2.rectangle(canvas, (_FRAME_W - 270, _FRAME_H + 5), (_FRAME_W - 140, _TOTAL_H - 5), avi_col, -1)
+    (tw, _), _ = cv2.getTextSize(avi_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+    cv2.putText(canvas, avi_txt,
+                (_FRAME_W - 270 + (120 - tw) // 2, _FRAME_H + 27),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+
+    # Save .tol button
     if _save_flash[0] > 0:
-        btn_col  = (30, 140, 30)
-        btn_text = "Generating..."
+        tol_col, tol_txt = (30, 140, 30), "Generating..."
         _save_flash[0] -= 1
     else:
-        btn_col  = (40, 100, 200)
-        btn_text = "Save .tol  [S]"
-
-    cv2.rectangle(canvas,
-                  (_FRAME_W - 130, _FRAME_H + 5),
-                  (_FRAME_W - 10,  _TOTAL_H  - 5),
-                  btn_col, -1)
-    (tw, _), _ = cv2.getTextSize(btn_text, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-    cv2.putText(canvas, btn_text,
+        tol_col, tol_txt = (40, 100, 200), "Save .tol  [S]"
+    cv2.rectangle(canvas, (_FRAME_W - 130, _FRAME_H + 5), (_FRAME_W - 10, _TOTAL_H - 5), tol_col, -1)
+    (tw, _), _ = cv2.getTextSize(tol_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+    cv2.putText(canvas, tol_txt,
                 (_FRAME_W - 130 + (120 - tw) // 2, _FRAME_H + 27),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
-    _disp_count[0] += 1
     if _disp_count[0] % 60 == 0:
-        _save_win_config()   # keep position/size fresh for close-button saves
+        _save_win_config()
 
     if _save_requested[0]:
         _save_requested[0] = False
         _pending_save[0]   = True
         _save_flash[0]     = FPS
-        escape[0]          = True   # stop animation; atexit will spawn headless run
+        escape[0]          = True
+    if _avi_requested[0]:
+        _avi_requested[0] = False
+        _pending_avi[0]   = True
+        _avi_flash[0]     = FPS
+        escape[0]         = True
 
     cv2.imshow(_WIN_NAME, canvas)
     key = cv2.waitKey(1) & 0xFF
@@ -181,16 +220,19 @@ def display_frame():
         _pending_save[0] = True
         _save_flash[0]   = FPS
         escape[0]        = True
+    elif key == ord('a'):
+        _pending_avi[0] = True
+        _avi_flash[0]   = FPS
+        escape[0]       = True
     if cv2.getWindowProperty(_WIN_NAME, cv2.WND_PROP_VISIBLE) < 1:
         _save_win_config()
         escape[0] = True
 
 def fade_out_and_close():
-    """30-frame gradual fade to black, then close window. Call at the end of every pattern."""
     import copy as _copy
     _last = _copy.deepcopy(byte_array)
-    for _step in range(30):
-        _t = 1.0 - (_step + 1) / 30
+    for _step in range(TAIL_FRAMES):
+        _t = 1.0 - (_step + 1) / TAIL_FRAMES
         for _y in range(HEIGHT):
             for _x in range(WIDTH):
                 byte_array[_y][_x] = [int(_last[_y][_x][_c] * _t) for _c in range(3)]
@@ -199,25 +241,34 @@ def fade_out_and_close():
     black_frame()
     cv2.destroyAllWindows()
     if _HEADLESS:
-        print(f"✅ Saved → {OUTPUT_FILE}")
+        print(f"\n✅  Saved → {OUTPUT_FILE}")
 
 def black_frame():
     global byte_array
     _save_win_config()
     byte_array = [[[0 for _ in range(3)] for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
-# ---------- atexit: headless re-run ----------
+# ---------- atexit ----------
 
 def _on_exit():
-    if not _pending_save[0] or _HEADLESS:
+    # Release AVI writer if in AVI render mode
+    if _AVI_MODE:
+        if _avi_writer[0] is not None:
+            _avi_writer[0].release()
+            print(f"\n✅  Saved → {AVI_FILE}")
         return
+    if _HEADLESS:
+        return
+    # GUI mode: spawn requested render jobs
     import subprocess
-    print(f"\n⚙️  Rendering '{_script_name}.tol' — please wait...")
-    result = subprocess.run([sys.executable, sys.argv[0], '--headless'])
-    if result.returncode == 0:
-        print(f"✅  Saved → {OUTPUT_FILE}")
-    else:
-        print("❌  Render failed")
+    if _pending_save[0]:
+        print(f"\n⚙️  Rendering '{_script_name}.tol' — please wait...")
+        r = subprocess.run([sys.executable, sys.argv[0], '--headless'])
+        print(f"✅  Saved → {OUTPUT_FILE}" if r.returncode == 0 else "❌  .tol render failed")
+    if _pending_avi[0]:
+        print(f"\n⚙️  Rendering '{_script_name}.avi' — please wait...")
+        r = subprocess.run([sys.executable, sys.argv[0], '--avi'])
+        print(f"✅  Saved → {AVI_FILE}" if r.returncode == 0 else "❌  .avi render failed")
 
 atexit.register(_on_exit)
 
@@ -226,15 +277,14 @@ atexit.register(_on_exit)
 byte_array = [[[0 for _ in range(3)] for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
 if _HEADLESS:
-    # write .tol header + 30 lead-in black frames up front
     hdr = bytearray(14)
     hdr[1:4]  = FRAME_COUNT.to_bytes(3, 'big')
     hdr[4:6]  = HEIGHT.to_bytes(2, 'big')
     hdr[6:8]  = WIDTH.to_bytes(2, 'big')
-    hdr[8:10]  = (10).to_bytes(2, 'big')   # frame delay ms — matches LEDEdit sample files
-    hdr[10:12] = (10).to_bytes(2, 'big')   # duplicate of bytes 8-9
-    hdr[12]    = 0x03                       # RGB colour channels
-    hdr[13]    = 0x01                       # loop mode
+    hdr[8:10]  = (10).to_bytes(2, 'big')
+    hdr[10:12] = (10).to_bytes(2, 'big')
+    hdr[12]    = 0x03
+    hdr[13]    = 0x01
     with open(OUTPUT_FILE, 'wb') as f:
         f.write(hdr)
     _black_row = bytes(WIDTH * 3)
@@ -242,6 +292,15 @@ if _HEADLESS:
         for _ in range(LEAD_FRAMES):
             for _ in range(HEIGHT):
                 f.write(_black_row)
+
+elif _AVI_MODE:
+    os.makedirs(_avi_dir, exist_ok=True)
+    _fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    _avi_writer[0] = cv2.VideoWriter(AVI_FILE, _fourcc, FPS, (WIDTH, HEIGHT))
+    _black_frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+    for _ in range(LEAD_FRAMES):
+        _avi_writer[0].write(_black_frame)
+
 else:
     cv2.namedWindow(_WIN_NAME, cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FREERATIO)
     cv2.setMouseCallback(_WIN_NAME, _on_mouse)
