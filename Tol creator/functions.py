@@ -10,7 +10,7 @@ import json
 _HEADLESS = '--headless' in sys.argv
 
 _script_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-_tol_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), '..', 'Tol files'))
+_tol_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Tol files'))
 OUTPUT_FILE = os.path.join(_tol_dir, _script_name + '.tol')
 
 _WIN_NAME   = "RGB Animation"
