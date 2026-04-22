@@ -46,12 +46,4 @@ while True and current_frame < FRAME_COUNT - 30:
     if escape[0]:
         break
 
-black_frame()  # Clear the screen
-for i in range(30):
-    save_frame()  # Save the last frame to the tol file
-
-cv2.destroyAllWindows()
-
-# Write to custom file
-
-print("✅ Hex values written to output.tol")
+fade_out_and_close()

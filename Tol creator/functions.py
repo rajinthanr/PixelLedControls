@@ -58,6 +58,7 @@ escape        = [False]
 _disp_count   = [0]
 _pending_save = [False]    # set True when user clicks Save — atexit spawns headless run
 _save_flash   = [0]        # countdown for button feedback
+_write_count  = [0]        # counts save_frame() calls; used for fade-in scaling
 
 _save_requested = [False]  # internal: button click detected this frame
 
@@ -88,10 +89,13 @@ def fade_pixels(byte_array, fade_value):
 def save_frame():
     if not _HEADLESS:
         return   # preview only — headless re-run does the real write
+    _write_count[0] += 1
+    # linear fade-in over the first 30 frames written
+    scale = min(1.0, _write_count[0] / 30)
     with open(OUTPUT_FILE, "ab") as f:
         for row in byte_array:
             for pixel in row:
-                f.write(bytes([int(min(255, max(0, p))) for p in pixel]))
+                f.write(bytes([int(min(255, max(0, p)) * scale) for p in pixel]))
 
 def display_frame():
     global pre_time
@@ -172,6 +176,22 @@ def display_frame():
     if cv2.getWindowProperty(_WIN_NAME, cv2.WND_PROP_VISIBLE) < 1:
         _save_win_config()
         escape[0] = True
+
+def fade_out_and_close():
+    """30-frame gradual fade to black, then close window. Call at the end of every pattern."""
+    import copy as _copy
+    _last = _copy.deepcopy(byte_array)
+    for _step in range(30):
+        _t = 1.0 - (_step + 1) / 30
+        for _y in range(HEIGHT):
+            for _x in range(WIDTH):
+                byte_array[_y][_x] = [int(_last[_y][_x][_c] * _t) for _c in range(3)]
+        save_frame()
+        display_frame()
+    black_frame()
+    cv2.destroyAllWindows()
+    if _HEADLESS:
+        print(f"✅ Saved → {OUTPUT_FILE}")
 
 def black_frame():
     global byte_array

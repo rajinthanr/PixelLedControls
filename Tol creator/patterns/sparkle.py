@@ -52,8 +52,4 @@ while True and current_frame < FRAME_COUNT - 30:
     if escape[0]:
         break
 
-black_frame()
-for i in range(30):
-    save_frame()
-cv2.destroyAllWindows()
-print("✅ Done — Tol files/sparkle.tol")
+fade_out_and_close()

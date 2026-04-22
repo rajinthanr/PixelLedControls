@@ -59,12 +59,4 @@ for t in range(5):
     
 
 
-black_frame()  # Clear the screen
-for i in range(30):
-    save_frame()  # Save the last frame to the tol file
-
-cv2.destroyAllWindows()
-
-# Write to custom file
-
-print("✅ Hex values written to output.tol")
+fade_out_and_close()

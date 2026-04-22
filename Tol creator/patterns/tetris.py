@@ -86,9 +86,4 @@ while True and current_frame < FRAME_COUNT - 30:
         active_blocks[i] = spawn_block()
 
 
-black_frame()
-for i in range(30):
-    save_frame()
-
-cv2.destroyAllWindows()
-print("✅ Hex values written to output.tol")
+fade_out_and_close()

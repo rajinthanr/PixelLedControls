@@ -132,10 +132,4 @@ for side in EVEN_SIDES:
 
 hold()
 
-# ── Tail ──────────────────────────────────────────────────────────────────────
-black_frame()
-for i in range(30):
-    save_frame()
-
-cv2.destroyAllWindows()
-print("✅ Done — Tol files/festival.tol")
+fade_out_and_close()

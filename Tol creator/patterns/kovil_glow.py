@@ -97,15 +97,4 @@ while not escape[0] and current_frame < FRAME_COUNT - 30:
     hold(10)
 
 
-import copy as _copy
-_last = _copy.deepcopy(byte_array)
-for _step in range(30):
-    _t = 1.0 - (_step + 1) / 30
-    for _y in range(HEIGHT):
-        for _x in range(WIDTH):
-            byte_array[_y][_x] = [int(_last[_y][_x][_c] * _t) for _c in range(3)]
-    save_frame()
-
-black_frame()
-cv2.destroyAllWindows()
-print("✅ Hex values written to output.tol")
+fade_out_and_close()
