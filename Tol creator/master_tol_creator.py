@@ -15,6 +15,7 @@ PATTERNS = [
     ("falling_dots",    "Solid rainbow background with growing dark circles"),
     ("heartbeat",       "Multi-colour pulse waves radiating from centre"),
     ("horiz_chase",     "Horizontal chase light bands"),
+    ("loader",          "Green→corrupt→fight gravity×3→cyan invasion→green flood loop"),
     ("panel_blinds",    "Venetian-blind shutter sweep with alternating colour panels"),
     ("panel_diamonds",  "Per-panel expanding diamond rings, random hues"),
     ("plasma",          "Four-wave plasma interference — always full brightness, shifting palette"),
