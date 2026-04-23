@@ -2,19 +2,19 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions import *
 
-# ── Tweak these values ───────────────────────────────────────────────────────
-BAND_SPEED  = 1     # columns the band moves per physics step — higher = faster
-BAND_WIDTH  = 4    # width of each white band in columns
-NUM_BANDS   = 8     # number of simultaneous sweeping bands
-SPEED       = 50    # physics interval (≈ 1 step per frame)
-# ─────────────────────────────────────────────────────────────────────────────
-# Palette: Kovil Glow — Forest Green bg, Warm White bands, Gold leading edge
-BG    = [0,   150,  0]    # Deep Forest Green #006400
-WHITE = [255, 255, 240]   # Warm White #FFFFF0
-GOLD  = [255, 215,  0]    # Gold leading edge #FFD700
+BAND_SPEED   = 1      # columns moved per physics step
+BAND_WIDTH   = 12     # width of each lit band in columns
+DARK_GAP     = 3      # dark columns between bands
+NUM_BANDS    = 10      # simultaneous bands
+SPEED        = 50     # physics interval
+HUE_DRIFT    = 0.004  # hue shift per physics step per band
 
-# Space bands evenly across the grid
-band_x = [i * (WIDTH // NUM_BANDS) for i in range(NUM_BANDS)]
+_DARK = [8, 8, 8]     # near-black background (3-pixel-equivalent dark colour)
+
+# Evenly space bands; each band has its own hue
+PERIOD   = BAND_WIDTH + DARK_GAP
+band_x   = [i * (WIDTH // NUM_BANDS) for i in range(NUM_BANDS)]
+band_hue = [i / NUM_BANDS for i in range(NUM_BANDS)]
 
 while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
@@ -27,18 +27,27 @@ while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
         continue
     pTloop = count
 
-    # Repaint full scene each physics step (no fading needed)
+    # Dark background
     for y in range(HEIGHT):
         for x in range(WIDTH):
-            byte_array[y][x] = list(BG)
+            byte_array[y][x] = _DARK[:]
 
     for b in range(NUM_BANDS):
+        hue = band_hue[b]
         for w in range(BAND_WIDTH):
             col = (band_x[b] + w) % WIDTH
-            color = GOLD if w == 0 else WHITE   # gold on leading pixel
+            # brightness peaks at the centre of the band, dims toward edges
+            t      = w / (BAND_WIDTH - 1)           # 0.0 → 1.0 across band
+            bright = 0.4 + 0.6 * (1.0 - abs(t - 0.5) * 2)  # 0.4 at edges, 1.0 at centre
+            # leading edge (w==0) gets a sharp white-hot tip
+            sat = 0.3 if w == 0 else 1.0
+            r, g, bl = hsv_to_rgb(hue, sat, bright)
+            pix = [int(r * 255), int(g * 255), int(bl * 255)]
             for y in range(HEIGHT):
-                byte_array[y][col] = list(color)
-        band_x[b] = (band_x[b] + BAND_SPEED) % WIDTH
+                byte_array[y][col] = pix[:]
+
+        band_x[b]   = (band_x[b]   + BAND_SPEED) % WIDTH
+        band_hue[b] = (band_hue[b] + HUE_DRIFT)  % 1.0
 
     if escape[0]:
         break

@@ -2,19 +2,25 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions import *
 
-# ── Tweak these values ───────────────────────────────────────────────────────
-SPEED       = 33    # physics interval (≈ 1 step per frame)
-FADE        = 8     # brightness cut per frame — controls green afterglow length
-PULSE_STEP  = 1.5   # columns the ring expands per physics step
-PULSE_THICK = 10    # ring thickness in columns
-# ─────────────────────────────────────────────────────────────────────────────
-# Palette: Kovil Glow — White leading edge fading to Green, then dark
-# Origin: center of Side 4 (middle of the 7-sided building)
+SPEED        = 120   # physics interval
+FADE         = 8    # afterglow decay per frame
+PULSE_STEP   = 1.5  # columns expanded per physics step
+PULSE_THICK  = 5   # ring thickness in columns
+BEAT_INTERVAL = 10  # physics steps between new beats
 
-CENTER_X = WIDTH // 2   # column 56 — center of Side 4
+CENTER_X = WIDTH // 2
+max_r    = WIDTH // 2 + PULSE_THICK
 
-pulse_r = 0.0
-max_r   = WIDTH // 2 + PULSE_THICK   # past the outermost column
+# pulses: [radius, (r, g, b)]
+pulses     = []
+beat_timer = 0
+
+def _spawn():
+    hue = random.random()
+    r, g, b = hsv_to_rgb(hue, 1.0, 1.0)
+    pulses.append([0.0, (int(r * 255), int(g * 255), int(b * 255))])
+
+_spawn()   # start with one immediately
 
 while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
     count += 1
@@ -28,24 +34,34 @@ while True and current_frame < FRAME_COUNT - TAIL_FRAMES:
         continue
     pTloop = count
 
-    for x in range(WIDTH):
-        dist    = abs(x - CENTER_X)
-        overlap = pulse_r - dist        # > 0 once the ring has passed this column
+    beat_timer += 1
+    if beat_timer >= BEAT_INTERVAL:
+        beat_timer = 0
+        _spawn()
 
-        if 0 < overlap <= PULSE_THICK:
-            # t=0 → leading bright-white edge, t=1 → trailing green edge
-            t = 1.0 - overlap / PULSE_THICK
-            r = int(255 * (1 - t))
-            g = int(100 * (1 - t) + 220 * t)
-            b = int(255 * (1 - t))
-            for y in range(HEIGHT):
-                byte_array[y][x][0] = min(255, byte_array[y][x][0] + r)
-                byte_array[y][x][1] = min(255, byte_array[y][x][1] + g)
-                byte_array[y][x][2] = min(255, byte_array[y][x][2] + b)
+    dead = []
+    for i, (pulse_r, (br, bg, bb)) in enumerate(pulses):
+        for x in range(WIDTH):
+            dist    = abs(x - CENTER_X)
+            overlap = pulse_r - dist
 
-    pulse_r += PULSE_STEP
-    if pulse_r > max_r:
-        pulse_r = 0.0   # restart the heartbeat
+            if 0 < overlap <= PULSE_THICK:
+                t = 1.0 - overlap / PULSE_THICK
+                brightness = 1.0 - t * 0.5
+                r = int(br * brightness)
+                g = int(bg * brightness)
+                b = int(bb * brightness)
+                for y in range(HEIGHT):
+                    byte_array[y][x][0] = min(255, byte_array[y][x][0] + r)
+                    byte_array[y][x][1] = min(255, byte_array[y][x][1] + g)
+                    byte_array[y][x][2] = min(255, byte_array[y][x][2] + b)
+
+        pulses[i][0] += PULSE_STEP
+        if pulses[i][0] > max_r:
+            dead.append(i)
+
+    for i in reversed(dead):
+        pulses.pop(i)
 
     if escape[0]:
         break

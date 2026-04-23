@@ -45,8 +45,8 @@ WIDTH           = SIDES * STRIPS_PER_SIDE   # 112
 
 FPS          = 30
 DURATION     = 60
-LEAD_FRAMES  = 60   # 2 s black lead-in
-TAIL_FRAMES  = 60   # 2 s black tail
+LEAD_FRAMES  = 0    # no black lead-in
+TAIL_FRAMES  = 30   # 1 s black tail
 FRAME_COUNT  = FPS * DURATION + LEAD_FRAMES + TAIL_FRAMES
 DROP_COUNT   = 400
 
@@ -63,7 +63,6 @@ _TOTAL_H = _FRAME_H + _BTN_H
 # --- shared mutable state ---
 escape         = [False]
 _disp_count    = [0]
-_write_count   = [0]
 _pending_save  = [False]
 _pending_avi   = [False]
 _save_flash    = [0]
@@ -104,12 +103,10 @@ def fade_pixels(byte_array, fade_value):
 def save_frame():
     if not _HEADLESS:
         return
-    _write_count[0] += 1
-    scale = min(1.0, _write_count[0] / LEAD_FRAMES)
     with open(OUTPUT_FILE, "ab") as f:
         for row in byte_array:
             for pixel in row:
-                f.write(bytes([int(min(255, max(0, p)) * scale) for p in pixel]))
+                f.write(bytes([int(min(255, max(0, p))) for p in pixel]))
 
 def _render_anim_canvas():
     rgb_array   = np.array(byte_array, dtype=np.uint8).reshape((HEIGHT, WIDTH, 3))
@@ -124,9 +121,6 @@ def _render_anim_canvas():
                     cy = _LABEL_H + y * _PX + _PX // 2
                     cv2.circle(anim_canvas, (cx, cy), _DOT_R, color.tolist(), -1)
     anim_canvas = cv2.cvtColor(anim_canvas, cv2.COLOR_RGB2BGR)
-    fade_scale  = min(1.0, _disp_count[0] / LEAD_FRAMES)
-    if fade_scale < 1.0:
-        anim_canvas = (anim_canvas * fade_scale).astype(np.uint8)
     for side in range(SIDES):
         x_off = side * (_PANEL_W + _GAP)
         label = f"Side {side + 1}"
@@ -154,10 +148,7 @@ def display_frame():
 
     if _AVI_MODE:
         if _avi_writer[0] is not None:
-            scale = min(1.0, _disp_count[0] / LEAD_FRAMES)
             raw = np.array(byte_array, dtype=np.uint8).reshape((HEIGHT, WIDTH, 3))
-            if scale < 1.0:
-                raw = (raw * scale).astype(np.uint8)
             _avi_writer[0].write(cv2.cvtColor(raw, cv2.COLOR_RGB2BGR))
         if _disp_count[0] % FPS == 0:
             print(f"  rendering .avi: {_disp_count[0]} / {FRAME_COUNT}", end="\r", flush=True)
@@ -229,16 +220,10 @@ def display_frame():
         escape[0] = True
 
 def fade_out_and_close():
-    import copy as _copy
-    _last = _copy.deepcopy(byte_array)
-    for _step in range(TAIL_FRAMES):
-        _t = 1.0 - (_step + 1) / TAIL_FRAMES
-        for _y in range(HEIGHT):
-            for _x in range(WIDTH):
-                byte_array[_y][_x] = [int(_last[_y][_x][_c] * _t) for _c in range(3)]
+    black_frame()
+    for _ in range(TAIL_FRAMES):
         save_frame()
         display_frame()
-    black_frame()
     cv2.destroyAllWindows()
     if _HEADLESS:
         print(f"\n✅  Saved → {OUTPUT_FILE}")
@@ -287,19 +272,11 @@ if _HEADLESS:
     hdr[13]    = 0x01
     with open(OUTPUT_FILE, 'wb') as f:
         f.write(hdr)
-    _black_row = bytes(WIDTH * 3)
-    with open(OUTPUT_FILE, 'ab') as f:
-        for _ in range(LEAD_FRAMES):
-            for _ in range(HEIGHT):
-                f.write(_black_row)
 
 elif _AVI_MODE:
     os.makedirs(_avi_dir, exist_ok=True)
     _fourcc = cv2.VideoWriter_fourcc(*'XVID')
     _avi_writer[0] = cv2.VideoWriter(AVI_FILE, _fourcc, FPS, (WIDTH, HEIGHT))
-    _black_frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
-    for _ in range(LEAD_FRAMES):
-        _avi_writer[0].write(_black_frame)
 
 else:
     cv2.namedWindow(_WIN_NAME, cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FREERATIO)

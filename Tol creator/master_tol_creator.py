@@ -10,21 +10,19 @@ SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 PATTERNS_DIR = os.path.join(SCRIPT_DIR, 'patterns')
 
 PATTERNS = [
-    ("confetti",       "Random green sparkle scatter"),
-    ("deepam",         "Deepam lamp effect"),
-    ("falling_dots",   "Rainbow columns falling downward"),
-    ("festival",       "Festival colour burst"),
-    ("golden_confetti","Gold confetti sparkle"),
-    ("golden_sweep",   "Gold sweep across panels"),
-    ("heartbeat",      "Crimson→amber pulse wave across panels"),
-    ("hor_lines",      "Green→white horizontal lines sweeping right"),
-    ("horiz_chase",    "Horizontal chase lights"),
-    ("kovil_glow",     "Warm white & forest green panels with gold cross-fade"),
-    ("rainy",          "Green/white rainfall — alternating panel directions"),
-    ("sparkle",        "Sparkle effect"),
-    ("story",          "Scripted white/green panel wipe"),
-    ("tetris",         "4×4 blocks falling and stacking"),
-    ("waterfall",      "Waterfall effect"),
+    ("bouncing_balls",  "Coloured balls bouncing on a checkerboard background"),
+    ("diamonds",        "Expanding diamond rings from centre, random hues"),
+    ("falling_dots",    "Solid rainbow background with growing dark circles"),
+    ("heartbeat",       "Multi-colour pulse waves radiating from centre"),
+    ("horiz_chase",     "Horizontal chase light bands"),
+    ("panel_blinds",    "Venetian-blind shutter sweep with alternating colour panels"),
+    ("panel_diamonds",  "Per-panel expanding diamond rings, random hues"),
+    ("plasma",          "Four-wave plasma interference — always full brightness, shifting palette"),
+    ("sparkle",         "Rainbow gradient background with white sparkles"),
+    ("story",           "Scripted white/green panel wipe"),
+    ("tri_chase",       "Tri-colour chasing bands across all panels"),
+    ("water_drops",     "Per-panel solid hues with expanding colour-change ripples"),
+    ("water_drops_dark","Dark background with expanding coloured water-drop rings"),
 ]
 
 _DARK  = "#1e1e1e"
